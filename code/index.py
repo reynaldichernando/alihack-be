@@ -6,10 +6,12 @@ import dashscope
 import json
 from pymongo import MongoClient
 import tldextract
+from flask_cors import CORS
 
 dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
-
+ 
 app = Flask(__name__)
+CORS(app)
 AI_API_KEY = os.environ.get('AI_API_KEY')
 client = MongoClient(os.environ.get("MONGODB_URI"))
 db = client['db']
@@ -86,6 +88,7 @@ def test():
     timestamp = body['timestamp']
     event_type = body['event_type']
     text_content = body['text_content']
+    
     
     # 2. call qwen ai to generate categories, topics, summary, and minute saved (if event start)
     categories = []

@@ -63,6 +63,7 @@ services:
             authType: anonymous
             methods:
               - GET
+              - POST
       customDomains:
         - domainName: auto
           protocol: HTTP
