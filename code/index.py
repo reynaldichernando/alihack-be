@@ -8,6 +8,9 @@ from pymongo import MongoClient
 import tldextract
 from flask_cors import CORS
 from collections import defaultdict, deque
+from modelscope.pipelines import pipeline
+from modelscope.utils.constant import Tasks
+from sklearn.manifold import TSNE
 
 dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
  
@@ -213,27 +216,45 @@ def metrics():
         "days": days
     }
     
+pipeline_se = pipeline(Tasks.sentence_embedding, model='damo/nlp_gte_sentence-embedding_english-small')
+
+def generate_embeddings(texts):
+    inputs = {'source_sentence': texts}
+    result = pipeline_se(input=inputs)
+    
+    return result['text_embedding']
+    
 
 @app.route('/metrics/topics', methods=['POST'])
 def metrics_topics():
+    body = request.get_json()
+    user_id = body['user_id']
+    start_time = body['start_time']
+    end_time = body['end_time']
+    
+    user_activities = db['user_activity'].find({
+        "user_id": user_id,
+        "timestamp": {"$gte": start_time, "$lt": end_time},
+        "event_type": "START"
+    })
+    
+    text_set = set()
+    
+    for activity in user_activities:
+        if 'topics' in activity:
+            for topic in activity['topics']:
+                text_set.add(topic)
+                
+    texts = list(text_set)
+    
+    embeddings = generate_embeddings(texts)
+    
+    perplexity = min(30, len(texts) - 1)
+    tsne = TSNE(n_components=3, random_state=42, perplexity=perplexity)
+    embeddings_3d = tsne.fit_transform(embeddings).tolist()
+    
     return {
-        "points": [
-        {
-            "label": "sports",
-            "x": 1,
-            "y": 1
-        },
-        {
-            "label": "NBA",
-            "x": 2,
-            "y": 2
-        },
-        {
-            "label": "basketball",
-            "x": 3,
-            "y": 3
-        },
-        ]
+        "points": [{"label": texts[i], "x": embeddings_3d[i][0], "y": embeddings_3d[i][1], "z": embeddings_3d[i][2], "size": 1} for i in range(len(texts))]
     }
 
 @app.route('/')
