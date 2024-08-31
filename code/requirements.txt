@@ -55,7 +55,6 @@ numpy==2.0.2
 omegaconf==2.0.6
 oss2==2.19.0
 packaging==24.1
-pandas==2.2.2
 pillow==10.4.0
 platformdirs==4.2.2
 pooch==1.8.2
@@ -74,7 +73,6 @@ requests-file==2.1.0
 sacrebleu==2.4.3
 safetensors==0.4.4
 scikit-learn==1.5.1
-scipy==1.13.1
 simplejson==3.19.3
 six==1.16.0
 sortedcontainers==2.4.0
