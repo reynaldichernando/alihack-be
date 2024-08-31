@@ -42,7 +42,6 @@ jmespath==0.10.0
 joblib==1.4.2
 lazy_loader==0.4
 librosa==0.10.2.post1
-llvmlite==0.43.0
 lxml==5.3.0
 MarkupSafe==2.1.5
 modelscope==1.17.1
@@ -54,7 +53,6 @@ networkx==3.2.1
 numba==0.60.0
 numpy==2.0.2
 omegaconf==2.0.6
-opencv-python==4.10.0.84
 oss2==2.19.0
 packaging==24.1
 pandas==2.2.2
@@ -63,7 +61,6 @@ platformdirs==4.2.2
 pooch==1.8.2
 portalocker==2.10.1
 protobuf==3.20.3
-pyarrow==17.0.0
 pycparser==2.22
 pycryptodome==3.20.0
 pymongo==4.8.0
