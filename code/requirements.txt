@@ -22,7 +22,7 @@ pymongo==4.8.0
 requests==2.32.3
 requests-file==2.1.0
 tldextract==5.1.2
-urllib3==2.2.2
+urllib3==1.26.16
 websocket-client==1.8.0
 Werkzeug==3.0.4
 yarl==1.9.6
