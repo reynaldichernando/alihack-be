@@ -81,7 +81,6 @@ def get_minutes_saved(text_content):
 
 @app.route('/track', methods=['POST'])
 def track():
-    print(os.environ.get("MONGODB_URI"))
     # 1. get text_content from request
     body = request.get_json()
     user_id = body['user_id']
