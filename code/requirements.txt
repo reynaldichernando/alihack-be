@@ -1,4 +1,4 @@
--f https://download.pytorch.org/whl/cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
 addict==2.4.0
 aiohappyeyeballs==2.4.0
 aiohttp==3.10.5
