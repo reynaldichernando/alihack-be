@@ -7,6 +7,7 @@ import json
 from pymongo import MongoClient
 import tldextract
 from flask_cors import CORS
+from collections import defaultdict, deque
 
 dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
  
@@ -89,29 +90,28 @@ def track():
     event_type = body['event_type']
     text_content = body['text_content']
     
-    
     # 2. call qwen ai to generate categories, topics, summary, and minute saved (if event start)
     categories = []
     topics = []
     summary = ""
     minutes_saved = 0
-    if event_type == "START":
-        website_content = db['website_content'].find_one({'url': url})
-        if website_content:
-            topics, summary = website_content['topics'], website_content['summary']
-            categories = website_content['categories']
-        else:
-            topics, summary = get_topics_and_summary(text_content)
-            categories = get_categories(summary)
-            
-            db['website_content'].insert_one({
-                'url': url,
-                'categories': categories,
-                'topics': topics,
-                'summary': summary
-            })
-            
-        minutes_saved = get_minutes_saved(text_content)
+    
+    website_content = db['website_content'].find_one({'url': url})
+    if website_content:
+        topics, summary = website_content['topics'], website_content['summary']
+        categories = website_content['categories']
+    else:
+        topics, summary = get_topics_and_summary(text_content)
+        categories = get_categories(summary)
+        
+        db['website_content'].insert_one({
+            'url': url,
+            'categories': categories,
+            'topics': topics,
+            'summary': summary
+        })
+        
+    minutes_saved = get_minutes_saved(text_content)
         
     # 3. put the data to user_activities database
     db['user_activity'].insert_one({
@@ -132,127 +132,87 @@ def track():
         "summary": summary,
         "minutes_saved": minutes_saved
     }
+    
+def get_domain_metrics(user_activities):
+    label_type_map = defaultdict(dict)
+    label_duration_map = defaultdict(int)
+    for activity in user_activities:
+        label = activity['domain']
+        event_type = activity['event_type']
+        timestamp = activity['timestamp']
+        
+        if "START" == event_type:
+            duration = 0
+            if 'END' in label_type_map[label] and 'START' in label_type_map[label]:
+                duration = label_type_map[label]['END'] - label_type_map[label]['START']
+                del label_type_map[label]['END'] 
+            elif 'POLL' in label_type_map[label] and 'START' in label_type_map[label]:
+                duration = label_type_map[label]['POLL'] - label_type_map[label]['START']
+                del label_type_map[label]['POLL']
+                
+            label_duration_map[label] += duration
+        label_type_map[label][event_type] = timestamp
+    
+    return {
+        "total_duration_seconds": sum([value for value in label_duration_map.values() if value > 0]),
+        "items": [{"label": key, "duration_seconds": value} for key, value in label_duration_map.items() if value > 0]
+        }
+    
+def get_category_metrics(user_activities):
+    label_type_map = defaultdict(dict)
+    label_duration_map = defaultdict(int)
+    for activity in user_activities:
+        label = activity['categories'][0] if len(activity['categories']) > 0 else 'None'
+        event_type = activity['event_type']
+        timestamp = activity['timestamp']
+        
+        if "START" == event_type:
+            duration = 0
+            if 'END' in label_type_map[label] and 'START' in label_type_map[label]:
+                duration = label_type_map[label]['END'] - label_type_map[label]['START']
+                del label_type_map[label]['END'] 
+            elif 'POLL' in label_type_map[label] and 'START' in label_type_map[label]:
+                duration = label_type_map[label]['POLL'] - label_type_map[label]['START']
+                del label_type_map[label]['POLL']
+                
+            label_duration_map[label] += duration
+        label_type_map[label][event_type] = timestamp
+    
+    return {
+        "total_duration_seconds": sum([value for value in label_duration_map.values() if value > 0]),
+        "items": [{"label": key, "duration_seconds": value} for key, value in label_duration_map.items() if value > 0]
+        }
+    
 
 @app.route('/metrics', methods=['POST'])
 def metrics():
+    body = request.get_json()
+    user_id = body['user_id']
+    start_time = body['start_time']
+    end_time = body['end_time']
+    type = body['type']
+    
+    user_activities = deque(db['user_activity'].find({
+        "user_id": user_id,
+        "timestamp": {"$gte": start_time, "$lt": end_time}
+    }).sort('timestamp', 1))
+    
+    days = []
+    seconds_per_day = 24 * 60 * 60
+    left = start_time
+    for right in range(start_time, end_time, seconds_per_day):
+        metrics = {}
+        if "CATEGORY" == type:
+            metrics = get_category_metrics([activity for activity in user_activities if left <= activity['timestamp'] < right])
+        else:
+            metrics = get_domain_metrics([activity for activity in user_activities if left <= activity['timestamp'] < right])
+        days.append(metrics)
+        left = right
+            
     return {
-        "days": [
-            {
-            "day": "Monday",
-            "total_duration_seconds": 12345,
-            "items": [
-                {
-                "label": "stackoverflow.com",
-                "duration_seconds": 3600
-                },
-                {
-                "label": "github.com",
-                "duration_seconds": 1800
-                },
-                {
-                "label": "news.ycombinator.com",
-                "duration_seconds": 900
-                }
-            ]
-            },
-            {
-            "day": "Tuesday",
-            "total_duration_seconds": 9876,
-            "items": [
-                {
-                "label": "medium.com",
-                "duration_seconds": 1500
-                },
-                {
-                "label": "dev.to",
-                "duration_seconds": 1200
-                },
-                {
-                "label": "youtube.com",
-                "duration_seconds": 2700
-                }
-            ]
-            },
-            {
-            "day": "Wednesday",
-            "total_duration_seconds": 11111,
-            "items": [
-                {
-                "label": "reddit.com/r/programming",
-                "duration_seconds": 2400
-                },
-                {
-                "label": "news.google.com",
-                "duration_seconds": 1800
-                },
-                {
-                "label": "stackoverflow.com",
-                "duration_seconds": 2700
-                }
-            ]
-            },
-            {
-            "day": "Thursday", 
-            "total_duration_seconds": 8642,
-            "items": [
-                {
-                "label": "github.com",
-                "duration_seconds": 3600
-                },
-                {
-                "label": "medium.com",
-                "duration_seconds": 1200
-                }
-            ]
-            },
-            {
-            "day": "Friday",
-            "total_duration_seconds": 13579,
-            "items": [
-                {
-                "label": "dev.to",
-                "duration_seconds": 1800
-                },
-                {
-                "label": "news.ycombinator.com",
-                "duration_seconds": 2700
-                },
-                {
-                "label": "youtube.com",
-                "duration_seconds": 3600
-                }
-            ]
-            },
-            {
-            "day": "Saturday",
-            "total_duration_seconds": 7200,
-            "items": [
-                {
-                "label": "reddit.com",
-                "duration_seconds": 3600
-                },
-                {
-                "label": "stackoverflow.com",
-                "duration_seconds": 1800
-                }
-            ]
-            },
-            {
-            "day": "Sunday",
-            "total_duration_seconds": 5400,
-            "items": [
-                {
-                "label": "github.com",
-                "duration_seconds": 1800
-                },
-                {
-                "label": "medium.com",
-                "duration_seconds": 1200
-                }
-            ]
-            }
-        ]
+        "days": days
     }
+    
 
 @app.route('/metrics/topics', methods=['POST'])
 def metrics_topics():
@@ -275,7 +235,6 @@ def metrics_topics():
         },
         ]
     }
-
 
 @app.route('/')
 def index():
