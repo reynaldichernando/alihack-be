@@ -7,16 +7,17 @@ import json
 from pymongo import MongoClient
 import tldextract
 from flask_cors import CORS
-from collections import defaultdict, deque
-from modelscope.pipelines import pipeline
-from modelscope.utils.constant import Tasks
+from collections import defaultdict
+import requests
 from sklearn.manifold import TSNE
+import numpy as np
 
 dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
  
 app = Flask(__name__)
 CORS(app)
 AI_API_KEY = os.environ.get('AI_API_KEY')
+JINA_API_KEY = os.environ.get('JINA_API_KEY')
 client = MongoClient(os.environ.get("MONGODB_URI"))
 db = client['db']
 
@@ -195,10 +196,10 @@ def metrics():
     end_time = body['end_time']
     type = body['type']
     
-    user_activities = deque(db['user_activity'].find({
+    user_activities = db['user_activity'].find({
         "user_id": user_id,
         "timestamp": {"$gte": start_time, "$lt": end_time}
-    }).sort('timestamp', 1))
+    }).sort('timestamp', 1)
     
     days = []
     seconds_per_day = 24 * 60 * 60
@@ -215,14 +216,23 @@ def metrics():
     return {
         "days": days
     }
-    
-pipeline_se = pipeline(Tasks.sentence_embedding, model='damo/nlp_gte_sentence-embedding_english-small')
 
 def generate_embeddings(texts):
-    inputs = {'source_sentence': texts}
-    result = pipeline_se(input=inputs)
+    url = 'https://api.jina.ai/v1/embeddings'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + JINA_API_KEY
+    }
+    payload = {
+        "model": "jina-embeddings-v2-base-en",
+        "normalized": True,
+        "embedding_type": "float",
+        "input": texts
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
     
-    return result['text_embedding']
+    return np.array([item['embedding'] for item in response.json()['data']])
     
 
 @app.route('/metrics/topics', methods=['POST'])
