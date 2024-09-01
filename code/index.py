@@ -166,7 +166,7 @@ def get_category_metrics(user_activities):
     label_type_map = defaultdict(dict)
     label_duration_map = defaultdict(int)
     for activity in user_activities:
-        label = activity['categories'][0] if len(activity['categories']) > 0 else 'None'
+        label = activity['categories'][0] if len(activity['categories']) > 0 else 'Other'
         event_type = activity['event_type']
         timestamp = activity['timestamp']
         
@@ -196,20 +196,20 @@ def metrics():
     end_time = body['end_time']
     type = body['type']
     
-    user_activities = db['user_activity'].find({
+    user_activities = list(db['user_activity'].find({
         "user_id": user_id,
         "timestamp": {"$gte": start_time, "$lt": end_time}
-    }).sort('timestamp', 1)
+    }).sort('timestamp', 1))
     
     days = []
     seconds_per_day = 24 * 60 * 60
     left = start_time
-    for right in range(start_time, end_time, seconds_per_day):
+    for right in range(start_time+seconds_per_day, end_time+1, seconds_per_day):
         metrics = {}
         if "CATEGORY" == type:
-            metrics = get_category_metrics([activity for activity in user_activities if left <= activity['timestamp'] < right])
+            metrics = get_category_metrics([activity for activity in user_activities if left <= activity['timestamp'] <= right])
         else:
-            metrics = get_domain_metrics([activity for activity in user_activities if left <= activity['timestamp'] < right])
+            metrics = get_domain_metrics([activity for activity in user_activities if left <= activity['timestamp'] <= right])
         days.append(metrics)
         left = right
             
