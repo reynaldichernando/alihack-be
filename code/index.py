@@ -259,7 +259,7 @@ def metrics_topics():
     
     embeddings = generate_embeddings(texts)
     
-    perplexity = min(30, len(texts) - 1)
+    perplexity = len(texts) / 100
     tsne = TSNE(n_components=3, random_state=42, perplexity=perplexity)
     embeddings_3d = tsne.fit_transform(embeddings).tolist()
     
